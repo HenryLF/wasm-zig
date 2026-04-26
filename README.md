@@ -1,6 +1,6 @@
 # wasm-zig
 
-A ts utility allowing easier interaction with zig built wasm executable.
+TypeScript utilities for loading and interacting with Zig-built WASM modules.
 
 Two classes cover the two standard use cases:
 
@@ -9,7 +9,7 @@ Two classes cover the two standard use cases:
 
 ## Installation
 
-```
+```sh
 npm install zig-wasm
 ```
 

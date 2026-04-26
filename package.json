@@ -1,8 +1,12 @@
 {
-  "name": "zig-wasm",
+  "name": "wasm-zig",
   "version": "0.0.1",
   "type": "module",
   "description": "TypeScript utilities for loading and interacting with WASM modules",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/HenryLF/wasm-zig"
+  },
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
