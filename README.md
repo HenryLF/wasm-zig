@@ -2,6 +2,24 @@
 
 TypeScript utilities for loading and interacting with Zig-built WASM modules.
 
+> [!NOTE]
+> **Scope disclaimer** — `wasm-zig` is a thin utility for loading a Zig-built `.wasm` binary
+> and doing typed reads/writes over its `WebAssembly.Memory`. It is intentionally minimal:
+> there is no JS↔Zig function-call marshalling, no two-way synchronisation, no automatic
+> TypeScript binding generation, and no plans to add them.
+>
+> If you need full bidirectional interop — JS calling Zig with automatic type conversion,
+> Zig calling back into JS, async/promise bridging, or generated type bindings — use a
+> dedicated tool instead:
+>
+> - **[Zigar](https://github.com/chung-leong/zigar)** — comprehensive Zig↔JS toolkit; supports two-way calls, promises, async generators, and native + WASM targets.
+> - **[zbind](https://github.com/nelipuu/zbind)** — generates typed TypeScript wrappers from Zig source; targets Node.js, Bun, and browsers.
+> - **[zig-js](https://github.com/mitchellh/zig-js)** — lets Zig call into the JS host environment from WASM using NaN-boxing for non-numeric values.
+> - **[zig-javascript-bridge](https://github.com/scottredig/zig-javascript-bridge)** — direct JS function calls from Zig WASM with type marshalling.
+>
+> `wasm-zig` is the right choice when you want to drop in a small Zig utility module with
+> zero framework overhead and you are comfortable managing memory yourself.
+
 Two classes cover the two standard use cases:
 
 - **`WasmExecutable`** — loads WASM on the main thread, plain `WebAssembly.Memory`
@@ -264,7 +282,7 @@ pub fn build(b: *std.Build) void {
     });
 
     exe.entry = .disabled;       // no main — exported functions are the API
-    exe.import_symbols = true;   // imports from the JS `env` namespace (jsLog, now, rand …)
+    exe.import_symbols = true;   // imports from the JS `env` namespace (jsLog, now, rand, sleep …)
     exe.import_memory = true;    // memory is provided by the JS host
     exe.shared_memory = true;    // required for WasmWorker (SharedArrayBuffer)
 
@@ -297,7 +315,7 @@ The binary is written to `zig-out/bin/<name>.wasm`.
 
 ## Zig side — `js.zig`
 
-The built-in imports (`jsLog`, `jsError`, `now`, `rand`) correspond directly to `src/lib/js.zig`. Copy it into your Zig project to get formatted logging and JS interop with no boilerplate.
+The built-in imports (`jsLog`, `jsError`, `now`, `rand`, `sleep`) correspond directly to `src/lib/js.zig`. Copy it into your Zig project to get formatted logging and JS interop with no boilerplate.
 
 ```zig
 const js = @import("lib/js.zig");
@@ -308,6 +326,8 @@ export fn tick() void {
 
     js.log("tick at {d:.2}ms", .{t});
 
+    js.sleep(100);             // block for 100 ms (Atomics.wait)
+
     if (something_went_wrong) {
         js.err(error.BadState); // logs "WASM error :: BadState" via console.error
     }
@@ -316,7 +336,7 @@ export fn tick() void {
 
 ### `js.zig`
 
-Drop this file into your Zig project. It implements the four symbols that `WasmExecutable` and `WasmWorker` inject into the `env` import namespace, and exposes two public helpers for formatted logging.
+Drop this file into your Zig project. It implements the five symbols that `WasmExecutable` and `WasmWorker` inject into the `env` import namespace, and exposes two public helpers for formatted logging.
 
 ```zig
 const std = @import("std");
@@ -326,6 +346,7 @@ extern fn jsError(ptr: [*]const u8, len: usize) void;
 
 pub extern fn now() f64;
 pub extern fn rand() f64;
+pub extern fn sleep(ms: f64) void;
 
 pub fn log(comptime fmt: []const u8, args: anytype) void {
     var buf: [4096]u8 = undefined;
@@ -342,5 +363,6 @@ pub fn err(e: anyerror) void {
 
 - **`now()`** — returns `performance.now()` from the JS host
 - **`rand()`** — returns `Math.random()` from the JS host
+- **`sleep(ms)`** — blocks the calling thread for `ms` milliseconds using `Atomics.wait` on a `SharedArrayBuffer`; requires the page to be cross-origin isolated (`COOP`/`COEP` headers)
 - **`log(fmt, args)`** — formats with `std.fmt.bufPrint` (4 KB stack buffer) and writes to `console.log`
 - **`err(e)`** — formats as `"WASM error :: <name>"` (256 B stack buffer) and writes to `console.error`

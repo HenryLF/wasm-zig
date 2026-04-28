@@ -63,6 +63,9 @@ export class WasmExecutable<T extends WebAssembly.Exports> {
         rand() {
           return Math.random();
         },
+        sleep(ms: number) {
+          Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+        },
         memory,
       },
     });
